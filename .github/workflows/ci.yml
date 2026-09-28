@@ -8,12 +8,11 @@ on:
 
 env:
   IMAGE_NAME: java-cicd-demo
-  # EDIT THESE two values with your SonarCloud details
+  
   SONAR_ORGANIZATION: your-sonarcloud-org-key
   SONAR_PROJECT_KEY: your-sonarcloud-project-key
 
 jobs:
-  # 1. Build and test
   build-and-test:
     runs-on: ubuntu-latest
     steps:
@@ -37,7 +36,7 @@ jobs:
           name: test-reports
           path: target/surefire-reports
 
-  # 2. Code analysis (composite action) - failure does NOT block the pipeline
+  
   sonar-analysis:
     needs: build-and-test
     runs-on: ubuntu-latest
@@ -55,7 +54,7 @@ jobs:
           organization: ${{ env.SONAR_ORGANIZATION }}
           project-key: ${{ env.SONAR_PROJECT_KEY }}
 
-  # 3. Docker build + push + Trivy scan (one reusable workflow)
+  
   docker-and-trivy:
     needs: [build-and-test, sonar-analysis]
     if: ${{ !cancelled() && github.event_name == 'push' && needs.build-and-test.result == 'success' }}
