@@ -1,0 +1,52 @@
+name: SonarQube / SonarCloud Scan
+description: Composite action - runs tests with coverage and sends the analysis to SonarCloud or SonarQube
+
+inputs:
+  sonar-token:
+    description: Sonar token
+    required: true
+  project-key:
+    description: Sonar project key
+    required: true
+  organization:
+    description: SonarCloud organization key (leave empty for self-hosted SonarQube)
+    required: false
+    default: ""
+  sonar-host-url:
+    description: Sonar server URL
+    required: false
+    default: "https://sonarcloud.io"
+  java-version:
+    description: Java version
+    required: false
+    default: "17"
+
+runs:
+  using: composite
+  steps:
+    - name: Set up JDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: ${{ inputs.java-version }}
+        cache: maven
+
+    - name: Cache Sonar packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.sonar/cache
+        key: ${{ runner.os }}-sonar
+
+    - name: Run Sonar analysis
+      shell: bash
+      env:
+        SONAR_TOKEN: ${{ inputs.sonar-token }}
+      run: |
+        ORG_ARG=""
+        if [ -n "${{ inputs.organization }}" ]; then
+          ORG_ARG="-Dsonar.organization=${{ inputs.organization }}"
+        fi
+        mvn -B verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar \
+          -Dsonar.projectKey="${{ inputs.project-key }}" \
+          -Dsonar.host.url="${{ inputs.sonar-host-url }}" \
+          $ORG_ARG
