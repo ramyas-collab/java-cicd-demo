@@ -65,7 +65,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Scan image with Trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:${{ inputs.image-tag }}
           format: table
