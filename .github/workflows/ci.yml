@@ -51,8 +51,8 @@ jobs:
         uses: ./.github/actions/sonarqube-scan
         with:
           sonar-token: ${{ secrets.SONAR_TOKEN }}
-          organization: ${{ env.SONAR_ORGANIZATION }}
-          project-key: ${{ env.SONAR_PROJECT_KEY }}
+          organization: ${{ vars.SONAR_ORGANIZATION }}
+          project-key: ${{ vars.SONAR_PROJECT_KEY }}
 
   
   docker-and-trivy:
