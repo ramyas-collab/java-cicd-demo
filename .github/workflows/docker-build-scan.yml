@@ -14,16 +14,13 @@ on:
         type: string
         default: "HIGH,CRITICAL"
       critical-threshold:
-        description: "Max allowed CRITICAL vulnerabilities before failing"
         required: false
         type: string
         default: "0"
       artifactory-maven-repo:
-        description: "Artifactory repo key for the jar"
         required: true
         type: string
       artifactory-docker-registry:
-        description: "Artifactory Docker registry host, e.g. your-instance.jfrog.io/docker-local"
         required: true
         type: string
     secrets:
@@ -54,7 +51,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push
+      - name: Log in to Artifactory Docker registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.artifactory-docker-registry }}
+          username: ${{ secrets.JF_USER }}
+          password: ${{ secrets.JF_ACCESS_TOKEN }}
+
+      - name: Build and push to both registries at once
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -62,6 +66,7 @@ jobs:
           tags: |
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:${{ inputs.image-tag }}
             ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:latest
+            ${{ inputs.artifactory-docker-registry }}/${{ inputs.image-name }}:${{ inputs.image-tag }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -83,7 +88,7 @@ jobs:
           output: trivy-report.json
           severity: ${{ inputs.severity }}
           ignore-unfixed: true
-          exit-code: "0"   # never fail here — the threshold step below decides pass/fail
+          exit-code: "0"
 
       - name: Show human-readable Trivy report
         uses: aquasecurity/trivy-action@v0.36.0
@@ -105,7 +110,7 @@ jobs:
           fi
           echo "✅ CRITICAL count is within threshold"
 
-  push-to-artifactory:
+  push-jar-to-artifactory:
     needs: [build-and-push, trivy-scan]
     runs-on: ubuntu-latest
     steps:
@@ -126,31 +131,6 @@ jobs:
         run: |
           jf rt upload "target/*.jar" \
             "${{ inputs.artifactory-maven-repo }}/com/example/${{ inputs.image-name }}/${{ inputs.image-tag }}/" \
-            --build-name="${{ inputs.image-name }}" \
-            --build-number="${{ inputs.image-tag }}"
-
-      - name: Log in to Docker Hub (to pull the scanned image)
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Pull scanned image
-        run: docker pull ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:${{ inputs.image-tag }}
-
-      - name: Tag image for Artifactory
-        run: |
-          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image-name }}:${{ inputs.image-tag }} \
-            ${{ inputs.artifactory-docker-registry }}/${{ inputs.image-name }}:${{ inputs.image-tag }}
-
-      - name: Log in to Artifactory Docker registry
-        run: |
-          echo "${{ secrets.JF_ACCESS_TOKEN }}" | docker login ${{ inputs.artifactory-docker-registry }} \
-            -u ${{ secrets.JF_USER }} --password-stdin
-
-      - name: Push image to Artifactory
-        run: |
-          jf docker push ${{ inputs.artifactory-docker-registry }}/${{ inputs.image-name }}:${{ inputs.image-tag }} \
             --build-name="${{ inputs.image-name }}" \
             --build-number="${{ inputs.image-tag }}"
 
