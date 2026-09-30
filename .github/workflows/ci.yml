@@ -8,11 +8,14 @@ on:
 
 env:
   IMAGE_NAME: java-cicd-demo
-  
-  SONAR_ORGANIZATION: your-sonarcloud-org-key
-  SONAR_PROJECT_KEY: your-sonarcloud-project-key
+  SONAR_ORGANIZATION: ramyas-collab
+  SONAR_PROJECT_KEY: ramyas-collab_java-cicd-demo
+  # EDIT these two for your JFrog setup
+  ARTIFACTORY_MAVEN_REPO: libs-release-local
+  ARTIFACTORY_DOCKER_REGISTRY: your-instance.jfrog.io/docker-local
 
 jobs:
+  # 1. Build and test
   build-and-test:
     runs-on: ubuntu-latest
     steps:
@@ -36,7 +39,13 @@ jobs:
           name: test-reports
           path: target/surefire-reports
 
-  
+      - name: Upload jar for later jobs
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-jar
+          path: target/*.jar
+
+  # 2. Code analysis (composite action)
   sonar-analysis:
     needs: build-and-test
     runs-on: ubuntu-latest
@@ -51,10 +60,10 @@ jobs:
         uses: ./.github/actions/sonarqube-scan
         with:
           sonar-token: ${{ secrets.SONAR_TOKEN }}
-          organization: ${{ vars.SONAR_ORGANIZATION }}
-          project-key: ${{ vars.SONAR_PROJECT_KEY }}
+          organization: ${{ env.SONAR_ORGANIZATION }}
+          project-key: ${{ env.SONAR_PROJECT_KEY }}
 
-  
+  # 3. Docker build + push + Trivy scan + Artifactory push (one reusable workflow)
   docker-and-trivy:
     needs: [build-and-test, sonar-analysis]
     if: ${{ !cancelled() && github.event_name == 'push' && needs.build-and-test.result == 'success' }}
@@ -62,6 +71,12 @@ jobs:
     with:
       image-name: java-cicd-demo
       image-tag: ${{ github.sha }}
+      critical-threshold: "0"
+      artifactory-maven-repo: ${{ vars.ARTIFACTORY_MAVEN_REPO || 'libs-release-local' }}
+      artifactory-docker-registry: ${{ vars.ARTIFACTORY_DOCKER_REGISTRY }}
     secrets:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      JF_URL: ${{ secrets.JF_URL }}
+      JF_USER: ${{ secrets.JF_USER }}
+      JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
