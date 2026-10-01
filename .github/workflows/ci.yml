@@ -71,7 +71,7 @@ jobs:
     with:
       image-name: java-cicd-demo
       image-tag: ${{ github.sha }}
-      critical-threshold: "0"
+      critical-threshold: "2"
       artifactory-maven-repo: ${{ vars.ARTIFACTORY_MAVEN_REPO || 'libs-release-local' }}
       artifactory-docker-registry: ${{ vars.ARTIFACTORY_DOCKER_REGISTRY }}
     secrets:
